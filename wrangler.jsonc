@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bff-coordinadores",
+  "main": "src/index.ts",
+  // Fecha máxima que soporta el workerd instalado (wrangler 4.128 → workerd 1.20260815).
+  // Subirla al actualizar wrangler: https://developers.cloudflare.com/workers/configuration/compatibility-dates/
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+  // Config no secreta. Los secretos van por `wrangler secret put`
+  // o .dev.vars en local — nunca acá.
+  "vars": {
+    "ENVIRONMENT": "development",
+    // URL del proyecto Supabase al que este BFF reenvía las requests.
+    // En local apunta al stack de `supabase start` de backend-supabase.
+    "SUPABASE_URL": "http://127.0.0.1:54321"
+  },
+  "env": {
+    "staging": {
+      "name": "bff-coordinadores-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "SUPABASE_URL": "https://REEMPLAZAR-staging.supabase.co"
+      }
+    },
+    "production": {
+      "name": "bff-coordinadores",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "SUPABASE_URL": "https://REEMPLAZAR-prod.supabase.co"
+      }
+    }
+  }
+}

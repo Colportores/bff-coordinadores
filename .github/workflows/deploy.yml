@@ -1,0 +1,35 @@
+name: Deploy
+
+# staging → Worker bff-coordinadores-staging · production → Worker bff-coordinadores
+# Requiere los secrets CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID en el environment homónimo.
+on:
+  push:
+    branches: [staging, production]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: wrangler deploy (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ github.ref_name }}
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Deploy
+        run: npx wrangler deploy --env ${{ github.ref_name }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

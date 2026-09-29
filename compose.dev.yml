@@ -1,0 +1,19 @@
+# Desarrollo local vía Docker. Ver README.md § Desarrollo.
+services:
+  bff:
+    build:
+      context: .
+      dockerfile: dockerfile.dev
+    volumes:
+      - .:/app
+      # node_modules vive en un volumen nombrado: más rápido que el bind mount
+      # y no ensucia el host. Se puebla desde la imagen la primera vez.
+      - node_modules:/app/node_modules
+    ports:
+      - "8788:8787"
+    env_file:
+      - path: .dev.vars
+        required: false
+
+volumes:
+  node_modules:
