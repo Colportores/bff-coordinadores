@@ -6,3 +6,5 @@
 *.jsonc text eol=lf
 *.ts text eol=lf
 dockerfile.dev text eol=lf
+*.json text eol=lf
+*.md text eol=lf
