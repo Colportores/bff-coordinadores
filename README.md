@@ -90,6 +90,9 @@ docker compose -f compose.dev.yml run --rm bff npm run check   # lint + typechec
 docker compose -f compose.dev.yml up                            # wrangler dev en http://localhost:8788
 ```
 
+- **Imagen y cachés compartidas.** `-p <nombre>` propio está bien para aislar contenedores y `node_modules`; la imagen (`bff-coordinadores-dev:latest`) es compartida por todos los proyectos.
+  `docker compose build` solo cuando cambia `dockerfile.dev`.
+
 El puerto del host es 8788 para poder correr a la vez que `bff-colportores` (8787).
 
 ## Privacidad
