@@ -222,6 +222,16 @@ describe("POST /v1/campanias/:campaniaId/colportores", () => {
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "unauthorized" });
     });
+
+    it("responde 401 con 42501 y status 401 (PostgREST lo trató como anon)", async () => {
+      supabaseInscribe(
+        errorPostgrest(401, "42501", "inscribir_colportor requiere un usuario autenticado"),
+      );
+      const res = await inscribir();
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "unauthorized" });
+    });
   });
 
   describe("cuando Supabase falla de otra forma", () => {

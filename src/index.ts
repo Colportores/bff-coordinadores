@@ -57,6 +57,12 @@ app.onError((err, c) => {
       });
       return c.json({ error: "unauthorized" }, 401);
     }
+    if (err.timeout) {
+      log.error("NET", "SUPABASE_TIMEOUT", "Supabase no respondió a tiempo", {
+        operacion: err.operacion,
+      });
+      return c.json({ error: "upstream_timeout" }, 504);
+    }
     log.error("NET", "SUPABASE_ERROR", "Supabase no respondió como se esperaba", {
       operacion: err.operacion,
       status: err.status,

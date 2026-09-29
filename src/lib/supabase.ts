@@ -32,9 +32,23 @@ export interface CuerpoDeError {
 
 const SIN_CUERPO: CuerpoDeError = { code: null, mensaje: null, detalles: null };
 
+/** Tope de cada llamada a PostgREST. Pasado, se corta y se responde 504 `upstream_timeout`. */
+const TIMEOUT_MS = 5000;
+
+/** El fetch se cortó por `AbortSignal.timeout` (o se abortó). DOMException no siempre es `instanceof Error`. */
+function esTimeout(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    (err.name === "TimeoutError" || err.name === "AbortError")
+  );
+}
+
 /**
  * Supabase respondió con error, con un cuerpo que no es JSON, o no respondió.
  * `status` es el HTTP de PostgREST (0 si no hubo respuesta) y `code`, el `code` de su cuerpo de error.
+ * `timeout` indica que no respondió dentro de `TIMEOUT_MS`.
  */
 export class ErrorSupabase extends Error {
   override readonly name = "ErrorSupabase";
@@ -46,6 +60,7 @@ export class ErrorSupabase extends Error {
     readonly status: number,
     readonly operacion: string,
     cuerpo: CuerpoDeError = SIN_CUERPO,
+    readonly timeout = false,
   ) {
     super(`Supabase respondió ${status} en ${operacion}`);
     this.code = cuerpo.code;
@@ -96,9 +111,10 @@ async function llamar(
         Accept: "application/json",
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch {
-    throw new ErrorSupabase(0, operacion);
+  } catch (err) {
+    throw new ErrorSupabase(0, operacion, SIN_CUERPO, esTimeout(err));
   }
 
   if (!res.ok) {
