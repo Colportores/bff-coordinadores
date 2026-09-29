@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { ErrorConfig } from "./lib/config";
 import { log } from "./lib/log";
 import { ErrorSupabase } from "./lib/supabase";
 import { requireAuth } from "./middleware/auth";
+import { requireConfig } from "./middleware/config";
 import { requireCoordinador } from "./middleware/coordinador";
 import { corsPanel } from "./middleware/cors";
 import { health } from "./routes/health";
@@ -28,23 +30,34 @@ app.use("*", corsPanel);
 
 app.route("/health", health);
 
-app.use("/v1/*", requireAuth, requireCoordinador);
+app.use("/v1/*", requireConfig, requireAuth, requireCoordinador);
 app.route("/v1/me", me);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 
+// Solo es 401 lo que dice que el token del usuario no sirve. Config faltante o Supabase caído nunca
+// son 401: el panel lo tomaría como sesión vencida y mandaría a todos a loguearse en loop.
 app.onError((err, c) => {
+  if (err instanceof ErrorConfig) {
+    log.error("NET", "CONFIG_INVALIDA", "falta config de Supabase o quedó un placeholder", {
+      variable: err.variable,
+    });
+    return c.json({ error: "config_error" }, 503);
+  }
+
   if (err instanceof ErrorSupabase) {
-    // PostgREST rechazó el JWT que este BFF ya había validado: se trata como sesión inválida.
-    if (err.status === 401) {
+    // PostgREST rechazó el JWT (PGRST3xx o 42501) que este BFF ya había validado.
+    if (err.jwtRechazado) {
       log.warn("AUTH", "JWT_RECHAZADO_POR_SUPABASE", "Supabase rechazó el token", {
         operacion: err.operacion,
+        code: err.code,
       });
       return c.json({ error: "unauthorized" }, 401);
     }
     log.error("NET", "SUPABASE_ERROR", "Supabase no respondió como se esperaba", {
       operacion: err.operacion,
       status: err.status,
+      code: err.code,
     });
     return c.json({ error: "upstream_error" }, 502);
   }

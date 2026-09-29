@@ -1,5 +1,11 @@
 import { createMiddleware } from "hono/factory";
-import { createRemoteJWKSet, type JWTPayload, jwtVerify } from "jose";
+import {
+  createRemoteJWKSet,
+  errors,
+  type JWTPayload,
+  type JWTVerifyOptions,
+  jwtVerify,
+} from "jose";
 import { log } from "../lib/log";
 import type { AppEnv } from "../types";
 
@@ -45,7 +51,11 @@ export async function verificarJwtSupabase(
   env: ClavesVerificacion,
 ): Promise<JWTPayload> {
   const issuer = `${env.SUPABASE_URL}/auth/v1`;
-  const opciones = { issuer, audience: "authenticated" } as const;
+  const opciones: JWTVerifyOptions = {
+    issuer,
+    audience: "authenticated",
+    requiredClaims: ["exp", "sub"],
+  };
 
   if (env.SUPABASE_JWT_SECRET) {
     const clave = new TextEncoder().encode(env.SUPABASE_JWT_SECRET);
@@ -55,6 +65,26 @@ export async function verificarJwtSupabase(
 
   const { payload } = await jwtVerify(token, jwksDe(`${issuer}/.well-known/jwks.json`), opciones);
   return payload;
+}
+
+/**
+ * Errores de jose que dicen "este token no sirve": corresponden a 401. Cualquier otro (el fetch del
+ * JWKS que falla, `JWKSTimeout`, `JWKSInvalid`, un JWKS que no responde 200) es infraestructura:
+ * responderlo como 401 desloguearía a todos durante una caída de Supabase Auth.
+ */
+const ERRORES_DE_TOKEN = [
+  errors.JWTExpired,
+  errors.JWTClaimValidationFailed,
+  errors.JWSSignatureVerificationFailed,
+  errors.JWSInvalid,
+  errors.JWTInvalid,
+  errors.JOSEAlgNotAllowed,
+  errors.JOSENotSupported,
+  errors.JWKSNoMatchingKey,
+];
+
+export function esErrorDeToken(err: unknown): boolean {
+  return ERRORES_DE_TOKEN.some((clase) => err instanceof clase);
 }
 
 function extraerBearer(header: string | undefined): string | null {
@@ -80,10 +110,15 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
     const role = typeof claims.role === "string" ? claims.role : "authenticated";
     c.set("auth", { userId: claims.sub, role, claims, token });
   } catch (err) {
-    log.warn("AUTH", "JWT_INVALID", "token rechazado", {
-      motivo: err instanceof Error ? err.name : "desconocido",
+    const motivo = err instanceof Error ? err.name : "desconocido";
+    if (esErrorDeToken(err)) {
+      log.warn("AUTH", "JWT_INVALID", "token rechazado", { motivo });
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    log.error("AUTH", "JWT_VERIFICACION_FALLO", "no se pudo verificar el token (JWKS o red)", {
+      motivo,
     });
-    return c.json({ error: "unauthorized" }, 401);
+    return c.json({ error: "upstream_error" }, 502);
   }
 
   await next();

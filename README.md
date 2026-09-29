@@ -29,11 +29,12 @@ Agregados por equipo y por zona, asignación de territorios, seguimiento de jorn
 
 El panel hace el login directo contra Supabase Auth con `supabase-js` (ADR-013) y manda el JWT en `Authorization: Bearer <jwt>`. En cada request a `/v1/*`:
 
-1. `requireAuth` verifica firma, emisor (`${SUPABASE_URL}/auth/v1`), audiencia (`authenticated`) y expiración. Sin token o con token inválido: **401**.
+0. `requireConfig` corta con **503** `config_error` si `SUPABASE_URL` o `SUPABASE_ANON_KEY` faltan o son un placeholder `REEMPLAZAR`.
+1. `requireAuth` verifica firma, emisor (`${SUPABASE_URL}/auth/v1`), audiencia (`authenticated`), `exp` y `sub`. Sin token o con token inválido: **401**. Si el JWKS de Supabase Auth no responde o es inválido: **502**.
 2. `requireCoordinador` llama a `public.tiene_rol('COORDINADOR')` por PostgREST **con el JWT del propio usuario**. La función respeta la vigencia (`valido_desde`/`valido_hasta`) y las bajas. Si no es coordinador: **403**. El rol nunca se lee de un claim del token ni de un header.
 3. Las rutas leen de PostgREST con el mismo JWT: la RLS decide qué ve cada coordinador.
 
-Si Supabase falla o no responde: **502** `upstream_error`. Si Supabase rechaza el JWT: **401**.
+Si PostgREST rechaza el JWT (401 con `code` `PGRST3xx` o `42501`): **401**. Cualquier otra falla de Supabase, incluido un 401 sin ese `code` (API key inválida): **502** `upstream_error`. Config faltante o Supabase caído nunca son 401: el panel lo tomaría como sesión vencida y mandaría a todos a loguearse en loop.
 
 ### Configuración
 

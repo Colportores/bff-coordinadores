@@ -1,7 +1,7 @@
 import { SELF } from "cloudflare:test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { origenesPermitidos } from "../src/middleware/cors";
-import { supabaseCon } from "./helpers";
+import { simularSupabase, supabaseCon, tokenDePrueba } from "./helpers";
 
 // CORS_ORIGINS de desarrollo en wrangler.jsonc.
 const PANEL_LOCAL = "http://localhost:3000";
@@ -53,6 +53,40 @@ describe("CORS", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe(PANEL_LOCAL);
     });
+  });
+});
+
+describe("CORS en respuestas de error", () => {
+  // Sin el header, el navegador esconde el status al panel y no puede distinguir 401 de 403 o 502.
+  async function conOrigen(token?: string): Promise<Response> {
+    return SELF.fetch("https://bff.test/v1/me", {
+      headers: token
+        ? { Origin: PANEL_LOCAL, Authorization: `Bearer ${token}` }
+        : { Origin: PANEL_LOCAL },
+    });
+  }
+
+  it("el 401 lleva Access-Control-Allow-Origin", async () => {
+    const res = await conOrigen();
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(PANEL_LOCAL);
+  });
+
+  it("el 403 lleva Access-Control-Allow-Origin", async () => {
+    supabaseCon({ esCoordinador: false });
+    const res = await conOrigen(await tokenDePrueba());
+
+    expect(res.status).toBe(403);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(PANEL_LOCAL);
+  });
+
+  it("el 502 lleva Access-Control-Allow-Origin", async () => {
+    simularSupabase(() => new Response("{}", { status: 500 }));
+    const res = await conOrigen(await tokenDePrueba());
+
+    expect(res.status).toBe(502);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(PANEL_LOCAL);
   });
 });
 

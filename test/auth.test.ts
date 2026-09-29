@@ -1,6 +1,7 @@
 import { env, SELF } from "cloudflare:test";
+import { SignJWT, UnsecuredJWT } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { get, simularSupabase, supabaseCon, tokenDePrueba } from "./helpers";
+import { get, simularSupabase, supabaseCon, tokenDePrueba, USER_ID } from "./helpers";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -76,6 +77,41 @@ describe("autenticación de /v1/*", () => {
     });
   });
 
+  describe("cuando el token es alg: none (sin firma)", () => {
+    it("responde 401", async () => {
+      const llamadas = supabaseCon();
+      const token = new UnsecuredJWT({ role: "authenticated" })
+        .setIssuer(`${env.SUPABASE_URL}/auth/v1`)
+        .setAudience("authenticated")
+        .setSubject(USER_ID)
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .encode();
+      const res = await get("/v1/me", token);
+
+      expect(res.status).toBe(401);
+      expect(llamadas).toHaveLength(0);
+    });
+  });
+
+  describe("cuando el token no trae exp", () => {
+    it("responde 401", async () => {
+      const llamadas = supabaseCon();
+      const clave = new TextEncoder().encode(env.SUPABASE_JWT_SECRET);
+      const token = await new SignJWT({ role: "authenticated" })
+        .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+        .setIssuer(`${env.SUPABASE_URL}/auth/v1`)
+        .setAudience("authenticated")
+        .setSubject(USER_ID)
+        .setIssuedAt()
+        .sign(clave);
+      const res = await get("/v1/me", token);
+
+      expect(res.status).toBe(401);
+      expect(llamadas).toHaveLength(0);
+    });
+  });
+
   describe("cuando el token no trae sub", () => {
     it("responde 401", async () => {
       const llamadas = supabaseCon();
@@ -143,13 +179,52 @@ describe("rol coordinador en /v1/*", () => {
     });
   });
 
-  describe("cuando Supabase rechaza el token", () => {
-    it("responde 401", async () => {
-      simularSupabase(() => new Response("{}", { status: 401 }));
+  describe("cuando PostgREST rechaza el JWT con un code de JWT", () => {
+    it.each(["PGRST301", "PGRST303", "42501"])("responde 401 con %s", async (code) => {
+      simularSupabase(() => Response.json({ code, message: "JWT rechazado" }, { status: 401 }));
       const res = await get("/v1/me", await tokenDePrueba());
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "unauthorized" });
+    });
+  });
+
+  describe("cuando Supabase da 401 sin code de JWT (API key inválida o gateway)", () => {
+    it("responde 502 si el cuerpo no trae code", async () => {
+      simularSupabase(() => Response.json({}, { status: 401 }));
+      const res = await get("/v1/me", await tokenDePrueba());
+
+      expect(res.status).toBe(502);
+      expect(await res.json()).toEqual({ error: "upstream_error" });
+    });
+
+    it("responde 502 con el 'Invalid API key' del gateway", async () => {
+      simularSupabase(() =>
+        Response.json(
+          {
+            message: "Invalid API key",
+            hint: "Double check your Supabase `anon` or `service_role` API key.",
+          },
+          { status: 401 },
+        ),
+      );
+      const res = await get("/v1/me", await tokenDePrueba());
+
+      expect(res.status).toBe(502);
+    });
+
+    it("responde 502 si el cuerpo no es JSON", async () => {
+      simularSupabase(() => new Response("Unauthorized", { status: 401 }));
+      const res = await get("/v1/me", await tokenDePrueba());
+
+      expect(res.status).toBe(502);
+    });
+
+    it("responde 502 si el code viene con otro status", async () => {
+      simularSupabase(() => Response.json({ code: "42501" }, { status: 403 }));
+      const res = await get("/v1/me", await tokenDePrueba());
+
+      expect(res.status).toBe(502);
     });
   });
 

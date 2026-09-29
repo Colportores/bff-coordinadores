@@ -1,18 +1,29 @@
+import { asegurarConfigSupabase } from "./config";
+
 /**
  * Cliente mínimo de PostgREST para el BFF.
  *
  * Cada llamada reenvía el JWT del usuario tal cual (ADR-013): Postgres ve `auth.uid()` del
  * coordinador y la RLS decide qué puede leer. El BFF nunca usa la service key.
  *
- * Los errores se lanzan como `ErrorSupabase` y los traduce `app.onError` (src/index.ts); las rutas
- * no los atrapan.
+ * Los errores se lanzan como `ErrorSupabase` o `ErrorConfig` y los traduce `app.onError`
+ * (src/index.ts); las rutas no los atrapan.
  */
 
 type ConfigSupabase = Pick<Env, "SUPABASE_URL" | "SUPABASE_ANON_KEY">;
 
 /**
+ * `code` de PostgREST que significan "el JWT del usuario no sirve": PGRST3xx (JWT inválido,
+ * vencido, sin claims) y 42501 (sin permiso con ese rol). Un 401 sin uno de estos lo devuelve el
+ * gateway por una API key inválida: es config nuestra, no del usuario.
+ */
+function esCodigoDeJwt(code: string | null): boolean {
+  return code !== null && (/^PGRST3\d\d$/.test(code) || code === "42501");
+}
+
+/**
  * Supabase respondió con error, con un cuerpo que no es JSON, o no respondió.
- * `status` es el HTTP de PostgREST, o 0 si no hubo respuesta.
+ * `status` es el HTTP de PostgREST (0 si no hubo respuesta) y `code`, el `code` de su cuerpo de error.
  */
 export class ErrorSupabase extends Error {
   override readonly name = "ErrorSupabase";
@@ -20,9 +31,24 @@ export class ErrorSupabase extends Error {
   constructor(
     readonly status: number,
     readonly operacion: string,
+    readonly code: string | null = null,
   ) {
     super(`Supabase respondió ${status} en ${operacion}`);
   }
+
+  /** PostgREST rechazó el JWT del usuario: corresponde 401. Cualquier otra falla es 502. */
+  get jwtRechazado(): boolean {
+    return this.status === 401 && esCodigoDeJwt(this.code);
+  }
+}
+
+/** Solo el `code` del cuerpo de error de PostgREST; el resto no se guarda ni se loguea. */
+async function codigoDeError(res: Response): Promise<string | null> {
+  const cuerpo: unknown = await res.json().catch(() => null);
+  if (typeof cuerpo === "object" && cuerpo !== null && "code" in cuerpo) {
+    return typeof cuerpo.code === "string" ? cuerpo.code : null;
+  }
+  return null;
 }
 
 async function llamar(
@@ -32,6 +58,8 @@ async function llamar(
   init: RequestInit,
   operacion: string,
 ): Promise<unknown> {
+  asegurarConfigSupabase(env);
+
   let res: Response;
   try {
     res = await fetch(`${env.SUPABASE_URL}/rest/v1/${ruta}`, {
@@ -48,9 +76,7 @@ async function llamar(
   }
 
   if (!res.ok) {
-    // El cuerpo del error no se lee: podría traer datos de la fila y acá no entra nada al log.
-    await res.body?.cancel();
-    throw new ErrorSupabase(res.status, operacion);
+    throw new ErrorSupabase(res.status, operacion, await codigoDeError(res));
   }
 
   try {
