@@ -1,5 +1,6 @@
-import { SELF } from "cloudflare:test";
+import { createExecutionContext, env, SELF, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import worker from "../src/index";
 import { origenesPermitidos } from "../src/middleware/cors";
 import { simularSupabase, supabaseCon, tokenDePrueba } from "./helpers";
 
@@ -78,6 +79,22 @@ describe("CORS en respuestas de error", () => {
     const res = await conOrigen(await tokenDePrueba());
 
     expect(res.status).toBe(403);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(PANEL_LOCAL);
+  });
+
+  it("el 503 config_error lleva Access-Control-Allow-Origin", async () => {
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(
+      new Request("https://bff.test/v1/me", {
+        headers: { Origin: PANEL_LOCAL, Authorization: `Bearer ${await tokenDePrueba()}` },
+      }),
+      { ...env, SUPABASE_ANON_KEY: "" },
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "config_error" });
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(PANEL_LOCAL);
   });
 

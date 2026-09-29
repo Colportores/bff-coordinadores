@@ -95,6 +95,31 @@ describe("requireAuth con JWKS (sin SUPABASE_JWT_SECRET)", () => {
     });
   });
 
+  describe("cuando el JWKS tiene 2 claves y el token no trae kid", () => {
+    it("responde 401, no 502", async () => {
+      const p = await proyecto();
+      const segunda = await generateKeyPair("ES256");
+      p.jwks.keys.push({
+        ...(await exportJWK(segunda.publicKey)),
+        kid: "clave-2",
+        alg: "ES256",
+        use: "sig",
+      });
+      const ajena = await generateKeyPair("ES256");
+      servirJwks(p, () => Response.json(p.jwks));
+      const token = await new SignJWT({ role: "authenticated" })
+        .setProtectedHeader({ alg: "ES256", typ: "JWT" })
+        .setIssuer(`${p.url}/auth/v1`)
+        .setAudience("authenticated")
+        .setSubject(USER_ID)
+        .setExpirationTime("1h")
+        .sign(ajena.privateKey);
+      const res = await pedir(p, token);
+
+      expect(res.status).toBe(401);
+    });
+  });
+
   describe("cuando el token es HS256", () => {
     it("responde 401", async () => {
       const p = await proyecto();

@@ -81,6 +81,8 @@ const ERRORES_DE_TOKEN = [
   errors.JOSEAlgNotAllowed,
   errors.JOSENotSupported,
   errors.JWKSNoMatchingKey,
+  // Token sin `kid` frente a un JWKS de varias claves: lo arma quien manda el token, no es infra.
+  errors.JWKSMultipleMatchingKeys,
 ];
 
 export function esErrorDeToken(err: unknown): boolean {
