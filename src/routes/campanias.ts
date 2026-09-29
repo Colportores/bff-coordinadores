@@ -81,7 +81,9 @@ function rechazoDeNegocio(
     };
   }
 
-  const rechazo = err.status === 400 && err.code ? tabla[err.code] : undefined;
+  // `Object.hasOwn`: un code como "constructor" no puede salir del prototipo como si fuera un rechazo.
+  const rechazo =
+    err.status === 400 && err.code && Object.hasOwn(tabla, err.code) ? tabla[err.code] : undefined;
   if (!rechazo || !err.mensaje) return null;
 
   const cuerpo: Record<string, unknown> = { error: rechazo.error, mensaje: err.mensaje };
