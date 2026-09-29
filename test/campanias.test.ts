@@ -243,6 +243,24 @@ describe("POST /v1/campanias/:campaniaId/colportores", () => {
       expect(await res.json()).toEqual({ error: "upstream_error" });
     });
 
+    it("un código de asignar zona (CZ0xx) no se traduce acá: responde 502", async () => {
+      supabaseInscribe(errorPostgrest(400, "CZ003", "El colportor no está en esta campaña."));
+      const res = await inscribir();
+
+      expect(res.status).toBe(502);
+    });
+
+    it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+      "responde 502 con un code que es una propiedad del prototipo (%s)",
+      async (code) => {
+        supabaseInscribe(errorPostgrest(400, code, "no es un rechazo"));
+        const res = await inscribir();
+
+        expect(res.status).toBe(502);
+        expect(await res.json()).toEqual({ error: "upstream_error" });
+      },
+    );
+
     it("responde 502 con un CI0xx sin mensaje", async () => {
       supabaseInscribe(() => Response.json({ code: "CI006" }, { status: 400 }));
       const res = await inscribir();

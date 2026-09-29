@@ -25,6 +25,7 @@ import type { AppEnv } from "./types";
  *   GET /v1/*     JWT de Supabase Auth + rol COORDINADOR vigente
  *   GET /v1/me    perfil del coordinador para el topbar del panel
  *   POST /v1/campanias/:campaniaId/colportores   inscribir un colportor (HU-CAM-004)
+ *   PUT  /v1/campanias/:campaniaId/colportores/:usuarioId/zona   asignar zona (HU-CAM-006)
  */
 const app = new Hono<AppEnv>();
 
