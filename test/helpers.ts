@@ -40,6 +40,8 @@ export interface LlamadaSupabase {
   url: string;
   headers: Headers;
   cuerpo: string | null;
+  /** El `signal` que pasó el worker al fetch (el timeout de `llamar`). */
+  signal: AbortSignal | null;
 }
 
 /**
@@ -59,6 +61,7 @@ export function simularSupabase(manejador: Manejador): LlamadaSupabase[] {
       url: req.url,
       headers: new Headers(req.headers),
       cuerpo: req.body ? await req.clone().text() : null,
+      signal: init?.signal ?? null,
     });
     return manejador(req);
   });

@@ -21,19 +21,51 @@ function esCodigoDeJwt(code: string | null): boolean {
   return code !== null && (/^PGRST3\d\d$/.test(code) || code === "42501");
 }
 
+/** Lo que se rescata del cuerpo de error de PostgREST (`{code, message, details, hint}`). */
+export interface CuerpoDeError {
+  code: string | null;
+  /** `message` del error. Solo lo usan las rutas para los rechazos de negocio conocidos; nunca se loguea. */
+  mensaje: string | null;
+  /** `details` parseado como JSON si se puede, o el string tal cual. Nunca se loguea. */
+  detalles: unknown;
+}
+
+const SIN_CUERPO: CuerpoDeError = { code: null, mensaje: null, detalles: null };
+
+/** Tope de cada llamada a PostgREST. Pasado, se corta y se responde 504 `upstream_timeout`. */
+const TIMEOUT_MS = 5000;
+
+/** El fetch se cortó por `AbortSignal.timeout` (o se abortó). DOMException no siempre es `instanceof Error`. */
+function esTimeout(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    (err.name === "TimeoutError" || err.name === "AbortError")
+  );
+}
+
 /**
  * Supabase respondió con error, con un cuerpo que no es JSON, o no respondió.
  * `status` es el HTTP de PostgREST (0 si no hubo respuesta) y `code`, el `code` de su cuerpo de error.
+ * `timeout` indica que no respondió dentro de `TIMEOUT_MS`.
  */
 export class ErrorSupabase extends Error {
   override readonly name = "ErrorSupabase";
+  readonly code: string | null;
+  readonly mensaje: string | null;
+  readonly detalles: unknown;
 
   constructor(
     readonly status: number,
     readonly operacion: string,
-    readonly code: string | null = null,
+    cuerpo: CuerpoDeError = SIN_CUERPO,
+    readonly timeout = false,
   ) {
     super(`Supabase respondió ${status} en ${operacion}`);
+    this.code = cuerpo.code;
+    this.mensaje = cuerpo.mensaje;
+    this.detalles = cuerpo.detalles;
   }
 
   /** PostgREST rechazó el JWT del usuario: corresponde 401. Cualquier otra falla es 502. */
@@ -42,13 +74,22 @@ export class ErrorSupabase extends Error {
   }
 }
 
-/** Solo el `code` del cuerpo de error de PostgREST; el resto no se guarda ni se loguea. */
-async function codigoDeError(res: Response): Promise<string | null> {
-  const cuerpo: unknown = await res.json().catch(() => null);
-  if (typeof cuerpo === "object" && cuerpo !== null && "code" in cuerpo) {
-    return typeof cuerpo.code === "string" ? cuerpo.code : null;
+function comoJson(texto: string): unknown {
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return texto;
   }
-  return null;
+}
+
+async function cuerpoDeError(res: Response): Promise<CuerpoDeError> {
+  const cuerpo: unknown = await res.json().catch(() => null);
+  if (typeof cuerpo !== "object" || cuerpo === null) return SIN_CUERPO;
+  const code = "code" in cuerpo && typeof cuerpo.code === "string" ? cuerpo.code : null;
+  const mensaje = "message" in cuerpo && typeof cuerpo.message === "string" ? cuerpo.message : null;
+  const detalles =
+    "details" in cuerpo && typeof cuerpo.details === "string" ? comoJson(cuerpo.details) : null;
+  return { code, mensaje, detalles };
 }
 
 async function llamar(
@@ -70,13 +111,14 @@ async function llamar(
         Accept: "application/json",
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch {
-    throw new ErrorSupabase(0, operacion);
+  } catch (err) {
+    throw new ErrorSupabase(0, operacion, SIN_CUERPO, esTimeout(err));
   }
 
   if (!res.ok) {
-    throw new ErrorSupabase(res.status, operacion, await codigoDeError(res));
+    throw new ErrorSupabase(res.status, operacion, await cuerpoDeError(res));
   }
 
   try {

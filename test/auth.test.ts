@@ -249,6 +249,26 @@ describe("rol coordinador en /v1/*", () => {
     });
   });
 
+  describe("cuando Supabase no responde a tiempo", () => {
+    it("cada llamada lleva un signal de timeout", async () => {
+      const llamadas = supabaseCon();
+      await get("/v1/me", await tokenDePrueba());
+
+      expect(llamadas.length).toBeGreaterThan(0);
+      for (const llamada of llamadas) expect(llamada.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("responde 504 upstream_timeout", async () => {
+      simularSupabase(() => {
+        throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      });
+      const res = await get("/v1/me", await tokenDePrueba());
+
+      expect(res.status).toBe(504);
+      expect(await res.json()).toEqual({ error: "upstream_timeout" });
+    });
+  });
+
   describe("cuando Supabase responde algo que no es JSON", () => {
     it("responde 502", async () => {
       simularSupabase(() => new Response("<html>", { status: 200 }));

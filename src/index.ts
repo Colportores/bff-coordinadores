@@ -6,6 +6,7 @@ import { requireAuth } from "./middleware/auth";
 import { requireConfig } from "./middleware/config";
 import { requireCoordinador } from "./middleware/coordinador";
 import { corsPanel } from "./middleware/cors";
+import { campanias } from "./routes/campanias";
 import { health } from "./routes/health";
 import { me } from "./routes/me";
 import type { AppEnv } from "./types";
@@ -23,6 +24,7 @@ import type { AppEnv } from "./types";
  *   GET /health   público
  *   GET /v1/*     JWT de Supabase Auth + rol COORDINADOR vigente
  *   GET /v1/me    perfil del coordinador para el topbar del panel
+ *   POST /v1/campanias/:campaniaId/colportores   inscribir un colportor (HU-CAM-004)
  */
 const app = new Hono<AppEnv>();
 
@@ -32,6 +34,7 @@ app.route("/health", health);
 
 app.use("/v1/*", requireConfig, requireAuth, requireCoordinador);
 app.route("/v1/me", me);
+app.route("/v1/campanias", campanias);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 
@@ -53,6 +56,12 @@ app.onError((err, c) => {
         code: err.code,
       });
       return c.json({ error: "unauthorized" }, 401);
+    }
+    if (err.timeout) {
+      log.error("NET", "SUPABASE_TIMEOUT", "Supabase no respondió a tiempo", {
+        operacion: err.operacion,
+      });
+      return c.json({ error: "upstream_timeout" }, 504);
     }
     log.error("NET", "SUPABASE_ERROR", "Supabase no respondió como se esperaba", {
       operacion: err.operacion,

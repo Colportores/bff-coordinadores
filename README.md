@@ -24,6 +24,24 @@ Agregados por equipo y por zona, asignación de territorios, seguimiento de jorn
 | `GET /health` | público | Liveness. |
 | `GET /v1/*` | JWT de Supabase Auth + rol `COORDINADOR` vigente | Todo lo del panel. |
 | `GET /v1/me` | ídem | Perfil del coordinador para el topbar: `{ userId, nombre, iniciales }`. |
+| `POST /v1/campanias/:campaniaId/colportores` | ídem | Inscribe un colportor (HU-CAM-004). Ver abajo. |
+
+### Inscribir un colportor (HU-CAM-004)
+
+`POST /v1/campanias/:campaniaId/colportores` con `{ "usuarioId": "<uuid>" }`. Llama a `inscribir_colportor()` con el JWT del coordinador; las reglas las aplica la base. Con éxito responde **201** `{ id, campaniaId, usuarioId, zonaId, metaLibros, creadaEn }`. Los rechazos llevan `error` (código estable) y `mensaje` (texto para mostrar):
+
+| Caso | Status | `error` |
+|---|---|---|
+| `campaniaId` o `usuarioId` no son UUID, o el cuerpo no es JSON | 400 | `entrada_invalida` |
+| No coordina esa campaña (`42501`) | 403 | `sin_permiso_en_campania` |
+| `CI001` campaña inexistente | 404 | `campania_no_encontrada` |
+| `CI002` campaña no vigente | 409 | `campania_no_vigente` |
+| `CI003` usuario inexistente o dado de baja | 422 | `usuario_no_encontrado` |
+| `CI004` email sin verificar | 409 | `email_sin_verificar` |
+| `CI005` cuenta suspendida | 409 | `cuenta_suspendida` |
+| `CI006` ya inscripto (también un reintento) | 409 | `ya_inscripto` |
+| `CI007` en otra campaña vigente: "Está en campaña X. Reasignar primero." + `campania: { id, nombre }` | 409 | `en_otra_campania` |
+| `CI008` inscripción dada de baja en esta campaña | 409 | `inscripcion_dada_de_baja` |
 
 ### Auth
 
