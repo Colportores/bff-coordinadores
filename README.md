@@ -2,7 +2,7 @@
 
 BFF de el panel de coordinadores ([front-coordinadores-web](https://github.com/Colportores/front-coordinadores-web)), como Worker de Cloudflare.
 
-**Estado: en construcción** — repo creado según la nomenclatura de [ADR-015](https://github.com/Colportores/docs-organizacion/blob/main/docs/decisiones/ADR-015-nomenclatura-repositorios.md); todavía sin código.
+**Estado: en construcción** — esqueleto con `GET /health`; el login y los endpoints llegan con front-coordinadores-web#18.
 
 ## Contexto
 
@@ -16,6 +16,18 @@ Parte del sistema [Colportaje App](https://github.com/Colportores). La arquitect
 ### Alcance
 
 Agregados por equipo y por zona, asignación de territorios, seguimiento de jornadas y reportes de la asociación a cargo del coordinador.
+
+## Desarrollo
+
+Todo corre en Docker; no hace falta Node en el host.
+
+```sh
+docker compose -f compose.dev.yml build
+docker compose -f compose.dev.yml run --rm bff npm run check   # lint + typecheck + tests con cobertura
+docker compose -f compose.dev.yml up                            # wrangler dev en http://localhost:8788
+```
+
+El puerto del host es 8788 para poder correr a la vez que `bff-colportores` (8787).
 
 ## Privacidad
 
