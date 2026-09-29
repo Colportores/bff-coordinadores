@@ -16,21 +16,34 @@
     "ENVIRONMENT": "development",
     // URL del proyecto Supabase al que este BFF reenvía las requests.
     // En local apunta al stack de `supabase start` de backend-supabase.
-    "SUPABASE_URL": "http://127.0.0.1:54321"
+    "SUPABASE_URL": "http://127.0.0.1:54321",
+    // Clave anon/publishable del proyecto: va en el header `apikey` de PostgREST. Es pública por
+    // diseño (ADR-013: viaja en la app y en los paneles) y no da permisos: los da el JWT del usuario
+    // con la RLS. La de desarrollo es la clave anon fija del stack local de `supabase start`.
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0",
+    // Orígenes del panel web que pueden llamar al BFF desde el navegador, separados por comas.
+    // En local, el `next dev` de front-coordinadores-web.
+    "CORS_ORIGINS": "http://localhost:3000"
   },
   "env": {
     "staging": {
       "name": "bff-coordinadores-staging",
       "vars": {
         "ENVIRONMENT": "staging",
-        "SUPABASE_URL": "https://REEMPLAZAR-staging.supabase.co"
+        "SUPABASE_URL": "https://REEMPLAZAR-staging.supabase.co",
+        "SUPABASE_ANON_KEY": "REEMPLAZAR-anon-key-staging",
+        // Dominio del panel en staging: todavía no está definido (front-coordinadores-web#18).
+        "CORS_ORIGINS": "https://REEMPLAZAR-panel-staging"
       }
     },
     "production": {
       "name": "bff-coordinadores",
       "vars": {
         "ENVIRONMENT": "production",
-        "SUPABASE_URL": "https://REEMPLAZAR-prod.supabase.co"
+        "SUPABASE_URL": "https://REEMPLAZAR-prod.supabase.co",
+        "SUPABASE_ANON_KEY": "REEMPLAZAR-anon-key-prod",
+        // Dominio del panel en producción: todavía no está definido (front-coordinadores-web#18).
+        "CORS_ORIGINS": "https://REEMPLAZAR-panel"
       }
     }
   }
