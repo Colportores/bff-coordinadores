@@ -43,6 +43,23 @@ Agregados por equipo y por zona, asignación de territorios, seguimiento de jorn
 | `CI007` en otra campaña vigente: "Está en campaña X. Reasignar primero." + `campania: { id, nombre }` | 409 | `en_otra_campania` |
 | `CI008` inscripción dada de baja en esta campaña | 409 | `inscripcion_dada_de_baja` |
 
+Criterio de los status: 404 si no existe el recurso del path, 422 si el del cuerpo no existe o no sirve para esta campaña, 409 si un estado impide la operación.
+
+### Asignar zona a un colportor (HU-CAM-006)
+
+`PUT /v1/campanias/:campaniaId/colportores/:usuarioId/zona` con `{ "zonaId": "<uuid>" }`. Llama a `asignar_zona()` con el JWT del coordinador y reemplaza la zona anterior. Responde **200** con la inscripción, con la misma forma que el alta; si ya tenía esa zona, devuelve la misma inscripción. Rechazos:
+
+| Caso | Status | `error` |
+|---|---|---|
+| Algún id no es UUID, o el cuerpo no es JSON | 400 | `entrada_invalida` |
+| No coordina esa campaña (`42501`) | 403 | `sin_permiso_en_campania` |
+| `CZ001` campaña inexistente | 404 | `campania_no_encontrada` |
+| `CZ002` campaña no vigente | 409 | `campania_no_vigente` |
+| `CZ003` el colportor no está en esta campaña | 404 | `colportor_no_inscripto` |
+| `CZ004` zona inexistente | 422 | `zona_no_encontrada` |
+| `CZ005` zona de otra ciudad | 422 | `zona_de_otra_ciudad` |
+| `CZ006` zona de otra campaña | 422 | `zona_de_otra_campania` |
+
 ### Auth
 
 El panel hace el login directo contra Supabase Auth con `supabase-js` (ADR-013) y manda el JWT en `Authorization: Bearer <jwt>`. En cada request a `/v1/*`:
