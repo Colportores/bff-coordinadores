@@ -1,2 +1,6 @@
 # Copiar a .dev.vars (ignorado por el control de versiones). Solo secretos; la config no secreta va en wrangler.jsonc -> vars.
-# Por ahora no hay secretos. Los agrega el login del coordinador (front-coordinadores-web#18).
+#
+# Secreto JWT *legacy* (HS256) de Supabase Auth. Solo hace falta si el proyecto sigue firmando con
+# el JWT secret simétrico. Con claves asimétricas (default en proyectos nuevos) dejarlo vacío:
+# el BFF valida contra ${SUPABASE_URL}/auth/v1/.well-known/jwks.json.
+SUPABASE_JWT_SECRET=
