@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: dockerfile.dev
+    # Una imagen por repo, la misma con cualquier `-p`: no se reconstruye salvo que cambie dockerfile.dev.
+    image: bff-coordinadores-dev:latest
     volumes:
       - .:/app
       # node_modules vive en un volumen nombrado: más rápido que el bind mount
