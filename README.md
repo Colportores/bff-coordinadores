@@ -1,5 +1,7 @@
 # bff-coordinadores
 
+> **Implementación futura:** diferido por tiempo (decisión 02/10). En la Fase 1 los clientes hablan directo con Supabase; ver [ADR-013](https://github.com/Colportores/docs-organizacion/blob/feature/adr-013-rpc-directo/docs/decisiones/ADR-013-clientes-directo-a-rpc-de-supabase.md) ([docs-organizacion#22](https://github.com/Colportores/docs-organizacion/pull/22)).
+
 BFF del panel de coordinadores ([front-coordinadores-web](https://github.com/Colportores/front-coordinadores-web)), como Worker de Cloudflare.
 
 **Estado: en construcción** — `GET /health`, verificación del JWT, rol `COORDINADOR` y `GET /v1/me` (front-coordinadores-web#18). Los endpoints de datos llegan con las HU del coordinador.
